@@ -3,6 +3,8 @@
 collects all dependencies from all orgs in a group and outputs to a file `snyk-deps_<timestamp>.csv`
 
 ## to run
+install with  `npm install`
+
 build with `npm run build`
 
 run with
