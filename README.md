@@ -3,11 +3,17 @@
 collects all dependencies from all orgs in a group and outputs to a file `snyk-deps_<timestamp>.csv`
 
 ## to run
-install with  `npm install`
+install with `npm install`
 
 build with `npm run build`
 
-run with
+### get all dependencies from all orgs in the specified group
 ```
 node dist/index.js --token=$SNYK_TOKEN --group-id=$SNYK_GROUP
+```
+
+### filter for 1 or more dependencies from all orgs in the specified group
+```
+node dist/index.js --token=$SNYK_TOKEN --group-id=$SNYK_GROUP \
+     --dependency-list="ansi-regex@2.0.0,assert-plus@1.0.0"
 ```

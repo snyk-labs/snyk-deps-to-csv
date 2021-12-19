@@ -49,12 +49,19 @@ const argv = yargs
       describe: `the id of the group to process 
                        if not specified, then taken from SNYK_GROUP`,
       demandOption: true,
+    },
+    'dependency-list': {
+      describe: `comma-delimited list of dependencies to filter results for 
+                       if not specified, then all dependencies are retrieved`,
+      demandOption: false,
     }
   })
   .help().argv;
 
 const token = argv['token']
 const groupId = argv['group-id']
+const dependencyList = argv['dependency-list']
+
 
 const requestManager = new requestsManager({
   snykToken: String(argv['token']),
@@ -79,7 +86,7 @@ async function processQueue(queue: any[], ) {
   let totalDeps: any = []
   var numProcessed: number = 0;
   var numAdditionallyFetched: number = 0;
-  console.log(`Processing ${queue.length} orgs for dependency data...`);
+  console.log(`processing ${queue.length} orgs for dependency data...`);
   await pMap(
     queue,
     async (reqData) => {
@@ -92,7 +99,7 @@ async function processQueue(queue: any[], ) {
         numAdditionallyFetched += additionalPages
         
         if (additionalPages > 0) {
-            var moreDeps = await getMoreDepsPages(reqData.url, additionalPages)
+            var moreDeps = await getMoreDepsPages(reqData.url, reqData.body, additionalPages)
             //splice additional data to base data
             totalDeps = totalDeps.concat(moreDeps)
         } 
@@ -101,7 +108,7 @@ async function processQueue(queue: any[], ) {
             for (const dep of totalDeps) {
                 debug(`dep: ${JSON.stringify(dep)}`)
                 for (const project of dep.projects) {
-                    debug(`for org ${reqData.orgId}, found project ${project.id},${project.name}`)
+                    // debug(`for org ${reqData.orgId}, found project ${project.id},${project.name}`)
                     let projectUrl = `https://app.snyk.io/org/${reqData.orgSlug}/project/${project.id}`
                     writeToCSV(`${reqData.orgSlug},${reqData.orgId},${dep.id},${dep.name},${dep.version},${project.name},${project.id},${projectUrl}`)
                 }
@@ -112,9 +119,8 @@ async function processQueue(queue: any[], ) {
 
         printProgress(` - ${++numProcessed}/${queue.length} completed (additional paged requests: ${numAdditionallyFetched})`);
 
-      } catch (e) {
-        console.log(`${e}`);
-        debug(e);
+      } catch (err: any) {
+        console.log(`${err}`);
       }
     },
     { concurrency: 10 },
@@ -122,7 +128,7 @@ async function processQueue(queue: any[], ) {
 
 }
 
-async function getMoreDepsPages(baseURL: string, additionalPages: number) {
+async function getMoreDepsPages(baseURL: string, filterBody: any, additionalPages: number) {
     let deps: any = []
     for(var  page = 2; page <= (additionalPages+1); page++) {
       try {
@@ -169,6 +175,21 @@ async function getSnykOrgs () {
 async function app() {
     debug(`token: ${token}`)
     debug(`groupId: ${groupId}`)
+
+    let filterBody = {}
+
+    if (dependencyList) { 
+      debug(`dependencyList: ${dependencyList}`)
+      try {
+        filterBody = {"filters": {"dependencies": String(dependencyList).split(',')}}
+      }
+      catch(err: any) {
+        console.log(`error parsing dependency-list, exiting...`)
+        exit(1)
+      }
+      console.log(`filtering dependencies for ${JSON.stringify(String(dependencyList).split(','), null, 2)}\n`)
+
+    }
     writeToCSV(`org-slug,org-id,dep-id,dep-name,dep-version,project-name,project-id,project-url`)
     let userMembershipQueue = [];
     // get all the orgs for the snyk group
@@ -179,12 +200,13 @@ async function app() {
         userMembershipQueue.push({
             verb: 'POST',
             url: `/org/${org.id}/dependencies?perPage=1000`,
-            body: {},
+            body: filterBody,
             orgId: org.id,
             orgSlug: org.slug
       });
     }
     await processQueue(userMembershipQueue)
+    console.log(`\n\nresults written to ${CSV_FILE}`)
 }
 
 app();
