@@ -1,6 +1,6 @@
 # snyk-deps-to-csv
 
-collects all dependencies from all orgs in a group and outputs to a file `snyk-deps_<timestamp>.csv`
+collects all dependencies from all orgs in a group and outputs to a CSV file `snyk-deps_<timestamp>.csv`, see an example [here](sample-output/snyk-deps_2022_01_05_05_40_39_59.csv).
 
 > To process all Snyk orgs in a group, ensure your token has group level permission.  If the token in use only has access to specific orgs in the group, only the data from those orgs will be retrieved.
 
