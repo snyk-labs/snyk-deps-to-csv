@@ -4,6 +4,8 @@ collects all dependencies from all orgs in a group and outputs to a CSV file `sn
 
 > To process all Snyk orgs in a group, ensure your token has group level permission.  If the token in use only has access to specific orgs in the group, only the data from those orgs will be retrieved.
 
+Please try to avoid running against your snyk group(s) more than 1x or 2x per day.
+
 ## To run
 install with `npm install`
 
