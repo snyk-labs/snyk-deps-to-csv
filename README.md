@@ -2,6 +2,8 @@
 
 collects all dependencies from all orgs in a group and outputs to a file `snyk-deps_<timestamp>.csv`
 
+> To process all Snyk orgs in a group, ensure your token has group level permission.  If the token in use only has access to specific orgs in the group, only the data from those orgs will be retrieved.
+
 ## To run
 install with `npm install`
 
