@@ -1,65 +1,64 @@
 {
-    "name": "snyk-deps-to-csv",
-    "version": "0.0.0",
-    "description": "collect dependencies for a snyk group into a combined csv",
-    "main": "dist/index.js",
-    "scripts": {
-      "format:check": "prettier --check '{''{src,test}/!(fixtures)/**/*,*}.{js,ts,json,yml}'",
-      "format": "prettier --write '{''{src,test}/!(fixtures)/**/*,*}.{js,ts,json,yml}'",
-      "lint": "npm run format:check && npm run lint:eslint",
-      "lint:eslint": "eslint --cache '{lib,test}/**/*.ts'",
-      "test": "npm run lint && npm run test:unit",
-      "test:unit": "jest --verbose",
-      "test:coverage": "npm run test:unit -- --coverage",
-      "test:watch": "tsc-watch --onSuccess 'npm run test:unit'",
-      "build": "tsc",
-      "build-watch": "tsc -w",
-      "prepare": "npm run build"
-    },
-    "types": "./dist/index.d.ts",
-    "license": "Apache-2.0",
-    "engines": {
-      "node": ">=12"
-    },
-    "files": [
-      "bin",
-      "dist",
-      "conf"
-    ],
-    "dependencies": {
-      "debug": "^4.1.1",
-      "ora": "^5.2.0",
-      "p-map": "4.0.0",
-      "snyk-request-manager": "^1.4.2",
-      "tslib": "^1.10.0",
-      "yargs": "^15.3.1"
-    },
-    "devDependencies": {
-      "@types/debug": "^4.1.7",
-      "@types/jest": "^25.1.1",
-      "@types/node": "^12.12.26",
-      "@types/yargs": "^15.0.5",
-      "@typescript-eslint/eslint-plugin": "^2.18.0",
-      "@typescript-eslint/parser": "^2.18.0",
-      "eslint": "^6.8.0",
-      "eslint-config-prettier": "^6.10.0",
-      "jest": "^26.6.3",
-      "prettier": "^1.19.1",
-      "ts-jest": "^26.5.5",
-      "tsc-watch": "^4.1.0",
-      "typescript": "^4.2.4"
-    },
-    "pkg": {
-      "scripts": [
-        "dist/*.js"
-      ]
-    },
-    "bin": {
-      "snyk-deps-to-csv": "./dist/index.js"
-    },
-    "release": {
-      "branches": [
-        "main"
-      ]
-    }
+  "name": "snyk-deps-to-csv",
+  "description": "collect dependencies for a snyk group into a combined csv",
+  "main": "dist/index.js",
+  "scripts": {
+    "format:check": "prettier --check '{''{src,test}/!(fixtures)/**/*,*}.{js,ts,json,yml}'",
+    "format": "prettier --write '{''{src,test}/!(fixtures)/**/*,*}.{js,ts,json,yml}'",
+    "lint": "npm run format:check && npm run lint:eslint",
+    "lint:eslint": "eslint --cache '**/*.ts'",
+    "test": "npm run lint && npm run test:unit",
+    "test:unit": "jest --verbose",
+    "test:coverage": "npm run test:unit -- --coverage",
+    "test:watch": "tsc-watch --onSuccess 'npm run test:unit'",
+    "build": "tsc",
+    "build-watch": "tsc -w",
+    "prepare": "npm run build"
+  },
+  "types": "./dist/index.d.ts",
+  "license": "Apache-2.0",
+  "engines": {
+    "node": ">=12"
+  },
+  "files": [
+    "bin",
+    "dist",
+    "conf"
+  ],
+  "dependencies": {
+    "debug": "^4.1.1",
+    "ora": "^5.2.0",
+    "p-map": "4.0.0",
+    "snyk-request-manager": "^1.4.2",
+    "tslib": "^1.10.0",
+    "yargs": "^15.3.1"
+  },
+  "devDependencies": {
+    "@types/debug": "^4.1.7",
+    "@types/jest": "^25.1.1",
+    "@types/node": "^12.12.26",
+    "@types/yargs": "^15.0.5",
+    "@typescript-eslint/eslint-plugin": "^2.18.0",
+    "@typescript-eslint/parser": "^2.18.0",
+    "eslint": "^6.8.0",
+    "eslint-config-prettier": "^6.10.0",
+    "jest": "^26.6.3",
+    "prettier": "^1.19.1",
+    "ts-jest": "^26.5.5",
+    "tsc-watch": "^4.1.0",
+    "typescript": "^4.2.4"
+  },
+  "pkg": {
+    "scripts": [
+      "dist/*.js"
+    ]
+  },
+  "bin": {
+    "snyk-deps-to-csv": "./dist/index.js"
+  },
+  "release": {
+    "branches": [
+      "main"
+    ]
   }
+}
