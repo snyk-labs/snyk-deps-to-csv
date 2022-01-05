@@ -29,5 +29,8 @@ node dist/index.js --token=$SNYK_TOKEN --group-id=$SNYK_GROUP \
 ## Contributing
 contributions are encouraged for this project, following the [contribution guidelines](.github/CONTRIBUTING.md)
 
+## Issues
+for any issues or questions, please submit a [github issue](https://github.com/snyk-tech-services/snyk-deps-to-csv/issues)
+
 ## License
 [License: Apache License, Version 2.0](LICENSE)
