@@ -123,7 +123,7 @@ async function processQueue(queue: any[], ) {
         console.log(`${err}`);
       }
     },
-    { concurrency: 10 },
+    { concurrency: 20 },
   );
 
 }
@@ -136,7 +136,8 @@ async function getMoreDepsPages(baseURL: string, filterBody: any, additionalPage
           debug(`fetching url: ${url}`)
           let response = await requestManager.request({
               verb: 'POST',
-              url: `${url}`
+              url: `${url}`,
+              body: filterBody
             });
           debug(`found ${response.data.results.length} results`)
           deps = deps.concat(response.data.results)
