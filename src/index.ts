@@ -109,8 +109,8 @@ async function processQueue(queue: any[], ) {
                 debug(`dep: ${JSON.stringify(dep)}`)
                 for (const project of dep.projects) {
                     // debug(`for org ${reqData.orgId}, found project ${project.id},${project.name}`)
-                    let projectUrl = `https://app.snyk.io/org/${reqData.orgSlug}/project/${project.id}`
-                    writeToCSV(`${reqData.orgSlug},${reqData.orgId},${dep.id},${dep.name},${dep.version},${project.name},${project.id},${projectUrl}`)
+                    let projectUrl = `https://app.snyk.io/org/${reqData.orgSlug}/project/${project.id}` 
+                    writeToCSV(`${reqData.orgSlug},${reqData.orgId},${dep.id.replace(',',';')},${dep.name},${dep.version.replace(',',';')},${project.name},${project.id},${projectUrl}`)
                 }
             }
         }
@@ -123,7 +123,7 @@ async function processQueue(queue: any[], ) {
         console.log(`${err}`);
       }
     },
-    { concurrency: 20 },
+    { concurrency: 10 },
   );
 
 }
