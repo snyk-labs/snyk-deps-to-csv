@@ -84,13 +84,16 @@ function printProgress(progress: string) {
 
 async function processQueue(queue: any[], ) {
   let totalDeps: any = []
-  var numProcessed: number = 0;
-  var numAdditionallyFetched: number = 0;
+  let numProcessed: number = 0;
+  let numAdditionallyFetched: number = 0;
+  let totalDepsCount: number = 0;
   console.log(`processing ${queue.length} orgs for dependency data...`);
   await pMap(
     queue,
     async (reqData) => {
       try {
+        totalDeps = []
+
         const res = await requestManager.request(reqData);
 
         totalDeps = res.data.results
@@ -99,25 +102,25 @@ async function processQueue(queue: any[], ) {
         numAdditionallyFetched += additionalPages
         
         if (additionalPages > 0) {
-            var moreDeps = await getMoreDepsPages(reqData.url, reqData.body, additionalPages)
             //splice additional data to base data
-            totalDeps = totalDeps.concat(moreDeps)
+            totalDeps = totalDeps.concat(await getMoreDepsPages(reqData.url, reqData.body, additionalPages))
         } 
 
         if (res.data.total != "0") { 
+            //console.log(`total deps found: ${res.data.total}`)
             for (const dep of totalDeps) {
-                debug(`dep: ${JSON.stringify(dep)}`)
+                //debug(`dep: ${JSON.stringify(dep)}`)
                 for (const project of dep.projects) {
                     // debug(`for org ${reqData.orgId}, found project ${project.id},${project.name}`)
                     let projectUrl = `https://app.snyk.io/org/${reqData.orgSlug}/project/${project.id}` 
-                    writeToCSV(`${reqData.orgSlug},${reqData.orgId},${dep.id.replace(',',';')},${dep.name},${dep.version.replace(',',';')},${project.name},${project.id},${projectUrl}`)
+                    writeToCSV(`${reqData.orgSlug},${reqData.orgId},${dep.id?.replace(',',';')},${dep.name},${dep.version?.replace(',',';')},${project.name},${project.id},${projectUrl}`)
                 }
             }
         }
 
-        totalDeps = []
+        totalDepsCount += totalDeps.length
 
-        printProgress(` - ${++numProcessed}/${queue.length} completed (additional paged requests: ${numAdditionallyFetched})`);
+        printProgress(` - ${++numProcessed}/${queue.length} completed (additional paged requests: ${numAdditionallyFetched}, total deps: ${totalDepsCount})`);
 
       } catch (err: any) {
         console.log(`${err}`);
@@ -130,23 +133,33 @@ async function processQueue(queue: any[], ) {
 
 async function getMoreDepsPages(baseURL: string, filterBody: any, additionalPages: number) {
     let deps: any = []
+    let queue = []
+    // build request list for concurrency
     for(var  page = 2; page <= (additionalPages+1); page++) {
-      try {
           let url = `${baseURL}&page=${page}`
-          debug(`fetching url: ${url}`)
-          let response = await requestManager.request({
+          debug(`queueing url: ${url}`)
+          queue.push({
               verb: 'POST',
               url: `${url}`,
               body: filterBody
             });
-          debug(`found ${response.data.results.length} results`)
-          deps = deps.concat(response.data.results)
-          //debug(`additional deps: ${JSON.stringify(deps)}`)
-      } catch (err: any) {
-          console.log(err);
-      }
     }
-    
+
+    await pMap(
+      queue,
+      async (reqData) => {
+        try {
+          const res = await requestManager.request(reqData);
+          //console.log(`found ${res.data.results.length} results for ${JSON.stringify(reqData)}`)
+          deps = deps.concat(res.data.results)
+        }
+        catch (err: any) {
+          console.log(`${err}`);
+        }
+      },
+      {concurrency: 10},
+    )
+
     return deps
 }
 
@@ -192,13 +205,13 @@ async function app() {
 
     }
     writeToCSV(`org-slug,org-id,dep-id,dep-name,dep-version,project-name,project-id,project-url`)
-    let userMembershipQueue = [];
+    let queue = [];
     // get all the orgs for the snyk group
     const orgs = await getSnykOrgs();
     debug(`orgs: ${orgs}`)
     for (const org of orgs) {
         debug(`org.id: ${org.id}`)
-        userMembershipQueue.push({
+        queue.push({
             verb: 'POST',
             url: `/org/${org.id}/dependencies?perPage=1000`,
             body: filterBody,
@@ -206,7 +219,7 @@ async function app() {
             orgSlug: org.slug
       });
     }
-    await processQueue(userMembershipQueue)
+    await processQueue(queue)
     console.log(`\n\nresults written to ${CSV_FILE}`)
 }
 
