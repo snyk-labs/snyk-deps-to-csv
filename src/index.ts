@@ -6,6 +6,7 @@ import * as debugLib from 'debug';
 import * as pMap from 'p-map';
 import * as fs from 'fs';
 import { exit } from 'process';
+import { error } from 'console';
 
 const readline = require('readline');
 const debug = debugLib('snyk:index');
@@ -66,6 +67,8 @@ const dependencyList = argv['dependency-list']
 const requestManager = new requestsManager({
   snykToken: String(argv['token']),
   userAgentPrefix: 'snyk-deps-to-csv',
+  burstSize: 1,
+  period: 1250
 });
 
 
@@ -83,57 +86,58 @@ function printProgress(progress: string) {
 }
 
 async function processQueue(queue: any[], ) {
-  let totalDeps: any = []
   let numProcessed: number = 0;
   let numAdditionallyFetched: number = 0;
   let totalDepsCount: number = 0;
   console.log(`processing ${queue.length} orgs for dependency data...`);
-  await pMap(
-    queue,
-    async (reqData) => {
-      try {
-        totalDeps = []
 
-        const res = await requestManager.request(reqData);
+  try {
+      queue.forEach(async function(url) {
+        let totalDeps: any = []
+        const result = await requestManager.request(url)
+        if (result.data.total != "0") { 
+            //console.log(`total deps found: ${result.data.total}`)
+            totalDeps = result.data.results
 
-        totalDeps = res.data.results
+            let additionalPages: number = Math.floor(Number(result.data.total)/1000)
+            numAdditionallyFetched += additionalPages
+          
+            if (additionalPages > 0) {
+                //splice additional data to base data
+                totalDeps = totalDeps.concat(await getMoreDepsPages(url.url, url.body, additionalPages))
+            } 
 
-        let additionalPages: number = Math.floor(Number(res.data.total)/1000)
-        numAdditionallyFetched += additionalPages
-        
-        if (additionalPages > 0) {
-            //splice additional data to base data
-            totalDeps = totalDeps.concat(await getMoreDepsPages(reqData.url, reqData.body, additionalPages))
-        } 
-
-        if (res.data.total != "0") { 
-            //console.log(`total deps found: ${res.data.total}`)
             for (const dep of totalDeps) {
                 //debug(`dep: ${JSON.stringify(dep)}`)
                 for (const project of dep.projects) {
-                    // debug(`for org ${reqData.orgId}, found project ${project.id},${project.name}`)
-                    let projectUrl = `https://app.snyk.io/org/${reqData.orgSlug}/project/${project.id}` 
-                    writeToCSV(`${reqData.orgSlug},${reqData.orgId},${dep.id?.replace(',',';')},${dep.name},${dep.version?.replace(',',';')},${project.name},${project.id},${projectUrl}`)
+                    let projectUrl = `https://app.snyk.io/org/${url.orgSlug}/project/${project.id}` 
+                    writeToCSV(`${url.orgSlug},${url.orgId},${dep.id?.replace(',',';')},${dep.name},${dep.version?.replace(',',';')},${project.name},${project.id},${projectUrl}`)
                 }
+                
             }
+
+            totalDepsCount += totalDeps.length
         }
-
-        totalDepsCount += totalDeps.length
-
         printProgress(` - ${++numProcessed}/${queue.length} completed (additional paged requests: ${numAdditionallyFetched}, total deps: ${totalDepsCount})`);
+      })
 
-      } catch (err: any) {
-        console.log(`${err}`);
-      }
-    },
-    { concurrency: 10 },
-  );
+  } catch (err: any) {
+      console.log(`error occurred: ${err}`);
 
+  }
 }
 
 async function getMoreDepsPages(baseURL: string, filterBody: any, additionalPages: number) {
+    const localRequestManager = new requestsManager({
+        snykToken: String(argv['token']),
+        userAgentPrefix: 'snyk-deps-to-csv',
+        burstSize: 1,
+        period: 3000
+    });
+
     let deps: any = []
     let queue = []
+
     // build request list for concurrency
     for(var  page = 2; page <= (additionalPages+1); page++) {
           let url = `${baseURL}&page=${page}`
@@ -145,20 +149,18 @@ async function getMoreDepsPages(baseURL: string, filterBody: any, additionalPage
             });
     }
 
-    await pMap(
-      queue,
-      async (reqData) => {
-        try {
-          const res = await requestManager.request(reqData);
-          //console.log(`found ${res.data.results.length} results for ${JSON.stringify(reqData)}`)
-          deps = deps.concat(res.data.results)
-        }
-        catch (err: any) {
-          console.log(`${err}`);
-        }
-      },
-      {concurrency: 10},
-    )
+    try {
+      const results: any[] = await requestManager.requestBulk(queue);
+      //console.log(`found ${res.data.results.length} results for ${JSON.stringify(reqData)}`)
+      results.forEach(function (result) {
+        deps = deps.concat(result.data.results)
+        //console.log(result.data.results)
+      })
+
+    } 
+    catch (err: any) {
+      console.log(`error occurred: ${err}`);
+    }
 
     return deps
 }
@@ -220,10 +222,7 @@ async function app() {
       });
     }
     await processQueue(queue)
-    console.log(`\n\nresults written to ${CSV_FILE}`)
+    console.log(`writing results to ${CSV_FILE}\n`)
 }
 
 app();
-
-
-
