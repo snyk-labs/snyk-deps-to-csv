@@ -68,7 +68,7 @@ const requestManager = new requestsManager({
   snykToken: String(argv['token']),
   userAgentPrefix: 'snyk-deps-to-csv',
   burstSize: 1,
-  period: 1250
+  period: 425
 });
 
 
@@ -128,12 +128,6 @@ async function processQueue(queue: any[], ) {
 }
 
 async function getMoreDepsPages(baseURL: string, filterBody: any, additionalPages: number) {
-    const localRequestManager = new requestsManager({
-        snykToken: String(argv['token']),
-        userAgentPrefix: 'snyk-deps-to-csv',
-        burstSize: 1,
-        period: 3000
-    });
 
     let deps: any = []
     let queue = []
