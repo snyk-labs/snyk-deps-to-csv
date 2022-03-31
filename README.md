@@ -23,9 +23,19 @@ node dist/index.js --token=$SNYK_TOKEN --group-id=$SNYK_GROUP \
 ```
 
 ### Filter by dependencies file from all orgs in the specified group (*nix example)
+
+Log4Shell:
+
 ```
 node dist/index.js --token=$SNYK_TOKEN --group-id=$SNYK_GROUP \
      --dependency-list="$(cat example-deps-files/log4j-core_deps.txt | xargs | sed -e 's/ /,/g')"
+```
+
+Spring4Shell:
+
+```
+node dist/index.js --token=$SNYK_TOKEN --group-id=$SNYK_GROUP \
+     --dependency-list="$(cat example-deps-files/spring4shell_deps.txt.txt | xargs | sed -e 's/ /,/g')"
 ```
 
 ## Contributing
