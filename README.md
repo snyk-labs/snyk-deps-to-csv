@@ -35,7 +35,7 @@ Spring4Shell:
 
 ```
 node dist/index.js --token=$SNYK_TOKEN --group-id=$SNYK_GROUP \
-     --dependency-list="$(cat example-deps-files/spring4shell_deps.txt.txt | xargs | sed -e 's/ /,/g')"
+     --dependency-list="$(cat example-deps-files/spring4shell_deps.txt | xargs | sed -e 's/ /,/g')"
 ```
 
 ## Contributing
