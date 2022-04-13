@@ -29,7 +29,7 @@
     "debug": "^4.1.1",
     "ora": "^5.2.0",
     "p-map": "4.0.0",
-    "snyk-request-manager": "^1.4.2",
+    "snyk-request-manager": "^1.5.0",
     "tslib": "^1.10.0",
     "yargs": "^15.3.1"
   },
