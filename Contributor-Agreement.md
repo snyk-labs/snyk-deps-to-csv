@@ -1,39 +1,47 @@
-# Snyk CLI tool contributor agreement
+# Contributing
 
-This Snyk CLI tool Agreement (this **"Agreement"**) applies to any Contribution you make to any Work.
+## Contributor Agreement
+A pull-request will only be considered for merging into the upstream codebase after you have signed our [contributor agreement](../Contributor-Agreement.md), assigning us the rights to the contributed code and granting you a license to use it in return. If you submit a pull request, you will be prompted to review and sign the agreement with one click (we use [CLA assistant](https://cla-assistant.io/)).
 
-This is a binding legal agreement on you and any organization you represent. If you are signing this Agreement on behalf of your employer or other organization, you represent and warrant that you have the authority to agree to this Agreement on behalf of the organization.
+## Commit messages
 
-## 1. Definitions
+Commit messages must follow the [Angular-style](https://github.com/angular/angular.js/blob/master/CONTRIBUTING.md#commit-message-format) commit format (but excluding the scope).
 
-**"Contribution"** means any original work, including any modification of or addition to an existing work, that you submit to Snyk CLI tool repo in any manner for inclusion in any Work.
+i.e:
 
-**"Snyk", "we"** and **"use"** means Snyk Ltd.
+```text
+fix: minified scripts being removed
+Also includes tests
+```
 
-**"Work"** means any project, work or materials owned or managed by Snyk Ltd.
+This will allow for the automatic changelog to generate correctly.
 
-**"You"** and **"your"** means you and any organization on whose behalf you are entering this Agreement.
+### Commit types
 
-## 2. Copyright Assignment, License and Waiver
+Must be one of the following:
 
-**(a) Assignment.** By submitting a Contribution, you assign to Snyk all right, title and interest in any copyright you have in the Contribution, and you waive any rights, including any moral rights, database rights, etc., that may affect your ownership of the copyright in the Contribution.
+* **feat**: A new feature
+* **fix**: A bug fix
+* **docs**: Documentation only changes
+* **test**: Adding missing tests
+* **chore**: Changes to the build process or auxiliary tools and libraries such as documentation generation
+* **refactor**: A code change that neither fixes a bug nor adds a feature
+* **style**: Changes that do not affect the meaning of the code (white-space, formatting, missing semi-colons, etc)
+* **perf**: A code change that improves performance
 
-**(b) License to Snyk.** If your assignment in Section 2(a) is ineffective for any reason, you grant to us and to any recipient of any Work distributed by use, a perpetual, worldwide, transferable, non-exclusive, no-charge, royalty-free, irrevocable, and sublicensable licence to use, reproduce, prepare derivative works of, publicly display, publicly perform, sublicense, and distribute Contributions and any derivative work created based on a Contribution. If your license grant is ineffective for any reason, you irrevocably waive and covenant to not assert any claim you may have against us, our successors in interest, and any of our direct or indirect licensees and customers, arising out of our, our successors in interest's, or any of our direct or indirect licensees' or customers' use, reproduction, preparation of derivative works, public display, public performance, sublicense, and distribution of a Contribution. You also agree that we may publicly use your name and the name of any organization on whose behalf you're entering into this Agreement in connection with publicizing the Work.
+To release a major you need to add `BREAKING CHANGE: ` to the start of the body and the detail of the breaking change.
 
-**(c) License to you.** We grant to you a perpetual, worldwide, transferable, non-exclusive, no-charge, royalty-free, irrevocable, and sublicensable license to use, reproduce, prepare derivative works of, publicly display, publicly perform, sublicense, and distribute a Contribution and any derivative works you create based on a Contribution.
+## Code standards
 
-## 3. Patent License
-You grant to us and to any recipient of any Work distributed by us, a perpetual, worldwide, transferable, non-exclusive, no-charge, royalty-free, irrevocable, and sublicensable patent license to make, have made, use, sell, offer to sell, import, and otherwise transfer the Contribution in whole or in part, along or included in any Work under any patent you own, or license from a third party, that is necessarily infringed by the Contribution or by combination of the Contribution with any Work.
+Ensure that your code adheres to the included `.eslintrc` config by running `npm run lint`.
 
-## 4. Your Representation and Warranties.
-By submitting a Contribution, you represent and warrant that: (a) each Contribution you submit is an original work and you can legally grant the rights set out in this Agreement; (b) the Contribution does not, and any exercise of the rights granted by you will not, infringe any third party's intellectual property or other right; and (c) you are not aware of any claims, suits, or actions pertaining to the Contribution. You will notify us immediately if you become aware or have reason to believe that any of your representations and warranties is or becomes inaccurate.
+## Sending pull requests
 
-##5. Intellectual Property
-Except for the assignment and licenses set forth in this Agreement, this Agreement does not transfer any right, title or interest in any intellectual property right of either party to the other. If you choose to provide us with suggestions, ideas for improvement, recommendations or other feedback, on any Work we may use your feedback without any restriction or payment.
+- new command line options are generally discouraged unless there's a *really* good reason
+- add tests for newly added code (and try to mirror directory and file structure if possible)
+- spell check
+- PRs will not be code reviewed unless all tests are passing
 
-## Miscellaneous
-English law governs this Agreement, excluding any applicable conflict of laws rules or principles, and the parties agree to the exclusive jurisdiction of the courts in England, UK. This Agreement does not create a partnership, agency relationship, or joint venture between the parties. We may assign this Agreement without notice or restriction. If any provision of this Agreement is unenforceable, that provision will be modified to render it enforceable to the extent possible to effect the parties' intention and the remaining provisions will not be affected. The parties may amend this Agreement only in a written amendment signed by both parties. This Agreement comprises the parties' entire agreement relating to the subject matter of this Agreement.
+*Important:* when fixing a bug, please commit a **failing test** first so that Travis CI (or I can) can show the code failing. Once that commit is in place, then commit the bug fix, so that we can test *before* and *after*.
 
-**Agreed and accepted on my behalf and on behalf of my organization**
-
-Our contributor agreement is based on the [mongoDB contributor agreement] (https://www.mongodb.com/legal/contributor-agreement).
+Remember that you're developing for multiple platforms and versions of node, so if the tests pass on your Mac or Linux or Windows machine, it *may* not pass elsewhere.
