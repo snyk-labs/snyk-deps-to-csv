@@ -111,7 +111,7 @@ async function processQueue(queue: any[], ) {
                 //debug(`dep: ${JSON.stringify(dep)}`)
                 for (const project of dep.projects) {
                     let projectUrl = `https://app.snyk.io/org/${url.orgSlug}/project/${project.id}` 
-                    writeToCSV(`${url.orgSlug},${url.orgId},${dep.id?.replace(',',';')},${dep.name},${dep.version?.replace(',',';')},${project.name},${project.id},${projectUrl}`)
+                    writeToCSV(`${url.orgSlug},${url.orgId},${dep.id?.replace(',',';')},${dep.name},${dep.version?.replace(',',';')},${dep.latestVersion},${dep.latestVersionPublishedDate},${dep.firstPublishedDate},${dep.isDeprecated},${project.name},${project.id},${projectUrl}`)
                 }
                 
             }
@@ -200,7 +200,7 @@ async function app() {
       console.log(`filtering dependencies for ${JSON.stringify(String(dependencyList).split(','), null, 2)}\n`)
 
     }
-    writeToCSV(`org-slug,org-id,dep-id,dep-name,dep-version,project-name,project-id,project-url`)
+    writeToCSV(`org-slug,org-id,dep-id,dep-name,dep-version,latest-version,latest-version-published-date,first-published-date,is-deprecated,project-name,project-id,project-url`)
     let queue = [];
     // get all the orgs for the snyk group
     const orgs = await getSnykOrgs();

@@ -69,7 +69,7 @@ function find_deps {
 	#
 
 	echo "Snyk Organization,Package Name,Package Version,Snyk Project Name,Snyk Project URL"
-	grep -i -e "$PKG_NAME," $DEP_CSV | cut -d, -f 1,4,5,6,8 | grep -e ",$PKG_VER," | sort
+	grep -i -e "$PKG_NAME," $DEP_CSV | cut -d, -f 1,4,5,10,12 | grep -e ",$PKG_VER," | sort
 
 	log "."
 	log "Done."
