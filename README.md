@@ -1,3 +1,7 @@
+![Snyk logo](https://snyk.io/style/asset/logo/snyk-print.svg)
+
+![snyk-oss-category](https://github.com/snyk-labs/oss-images/blob/main/oss-community.jpg)
+
 # snyk-deps-to-csv
 
 collects all dependencies from all orgs in a group and outputs to a CSV file `snyk-deps_<timestamp>.csv`, see an example [here](sample-output/snyk-deps_2022_01_05_05_40_39_59.csv).
