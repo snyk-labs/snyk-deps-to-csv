@@ -1,222 +1,319 @@
 #!/usr/bin/env node
 
-import * as yargs from 'yargs';
+import yargs from 'yargs';
+import { hideBin } from 'yargs/helpers';
 import { requestsManager } from 'snyk-request-manager';
-import * as debugLib from 'debug';
-import * as pMap from 'p-map';
-import * as fs from 'fs';
-import { exit } from 'process';
-import { error } from 'console';
+import type { AxiosResponse } from 'axios';
+import debugLib from 'debug';
+import pMap from 'p-map';
+import fs from 'fs';
+import readline from 'readline';
 
-const readline = require('readline');
 const debug = debugLib('snyk:index');
 
-var m = new Date();
+/** V1 API: dependencies endpoint allows up to 150 requests/minute per user. */
+const DEPENDENCIES_RATE_LIMIT_PER_MIN = 150;
+/** Stay below the documented limit to leave headroom for retries after 429s. */
+const RATE_LIMIT_SAFETY_FACTOR = 0.9;
+const REQUEST_PERIOD_MS = Math.ceil(
+  60_000 / (DEPENDENCIES_RATE_LIMIT_PER_MIN * RATE_LIMIT_SAFETY_FACTOR),
+);
+const REQUEST_BURST_SIZE = 1;
+const DEPS_PER_PAGE = 1000;
+const GROUP_ORGS_PER_PAGE = 100;
+const ORG_PROCESS_CONCURRENCY = 3;
 
-const LOG_TIMESTAMP =
-    m.getUTCFullYear() +
-    '_' +
-    ('0' + (m.getUTCMonth() + 1)).slice(-2) +
-    '_' +
-    ('0' + m.getUTCDate()).slice(-2) +
-    '_' +
-    ('0' + m.getUTCHours()).slice(-2) +
-    '_' +
-    ('0' + m.getUTCMinutes()).slice(-2) +
-    '_' +
-    ('0' + m.getUTCSeconds()).slice(-2) +
-    '_' +
-    ('0' + m.getUTCMilliseconds()).slice(-2) +
-    '';
+interface GroupOrg {
+  id: string;
+  slug: string;
+  name: string;
+}
 
-const LOG_FILE="snyk-deps-to-csv.log"
-const CSV_FILE=`snyk-deps_${LOG_TIMESTAMP}.csv`
+interface DependencyProject {
+  id: string;
+  name: string;
+}
 
-const argv = yargs
+interface Dependency {
+  id?: string;
+  name: string;
+  version?: string;
+  latestVersion?: string;
+  latestVersionPublishedDate?: string;
+  firstPublishedDate?: string;
+  isDeprecated?: boolean;
+  projects: DependencyProject[];
+}
+
+interface DependenciesResponse {
+  results: Dependency[];
+  total: number | string;
+}
+
+interface GroupOrgsResponse {
+  orgs: GroupOrg[];
+}
+
+interface OrgJob {
+  orgId: string;
+  orgSlug: string;
+  filterBody: string;
+}
+
+function timestamp(): string {
+  const m = new Date();
+  const pad = (n: number, len = 2): string => String(n).padStart(len, '0');
+  return [
+    m.getUTCFullYear(),
+    pad(m.getUTCMonth() + 1),
+    pad(m.getUTCDate()),
+    pad(m.getUTCHours()),
+    pad(m.getUTCMinutes()),
+    pad(m.getUTCSeconds()),
+    pad(m.getUTCMilliseconds(), 3),
+  ].join('_');
+}
+
+const CSV_FILE = `snyk-deps_${timestamp()}.csv`;
+
+const argv = yargs(hideBin(process.argv))
   .usage(
     `\nUsage: $0 [OPTIONS]
-                If no arguments are specified, values will be picked up from environment variables.\n
-                If pointing to a self-hosted or on-premise instance of Snyk,
-                SNYK_API is required to be set in your environment,
-                e.g. SNYK_API=https://my.snyk.domain/api. If omitted, then Snyk SaaS is used.`,
+If no arguments are specified, values are picked up from environment variables.
+
+If pointing to a self-hosted or on-premise instance of Snyk,
+SNYK_API is required to be set in your environment,
+e.g. SNYK_API=https://my.snyk.domain/api. If omitted, Snyk SaaS is used.`,
   )
   .options({
-    'token': {
-      describe: `your snyk token 
-                       if not specified, then taken from SNYK_TOKEN`,
-      demandOption: true,
+    token: {
+      describe: 'Your Snyk API token. If not specified, taken from SNYK_TOKEN.',
+      type: 'string',
+      default: process.env.SNYK_TOKEN,
     },
     'group-id': {
-      describe: `the id of the group to process 
-                       if not specified, then taken from SNYK_GROUP`,
-      demandOption: true,
+      describe:
+        'The id of the group to process. If not specified, taken from SNYK_GROUP.',
+      type: 'string',
+      default: process.env.SNYK_GROUP,
     },
     'dependency-list': {
-      describe: `comma-delimited list of dependencies to filter results for 
-                       if not specified, then all dependencies are retrieved`,
-      demandOption: false,
-    }
+      describe:
+        'Comma-delimited list of dependencies to filter results for. If not specified, all dependencies are retrieved.',
+      type: 'string',
+    },
+    concurrency: {
+      describe: `Number of orgs to process in parallel (default ${ORG_PROCESS_CONCURRENCY}). Requests still respect the global rate limiter.`,
+      type: 'number',
+      default: ORG_PROCESS_CONCURRENCY,
+    },
   })
-  .help().argv;
+  .demandOption(['token', 'group-id'])
+  .help()
+  .parseSync();
 
-const token = argv['token']
-const groupId = argv['group-id']
-const dependencyList = argv['dependency-list']
-
+const groupId = argv['group-id'] as string;
+const dependencyList = argv['dependency-list'] as string | undefined;
+const orgConcurrency = argv.concurrency as number;
 
 const requestManager = new requestsManager({
-  snykToken: String(argv['token']),
+  snykToken: String(argv.token),
   userAgentPrefix: 'snyk-deps-to-csv',
-  burstSize: 1,
-  period: 425
+  burstSize: REQUEST_BURST_SIZE,
+  period: REQUEST_PERIOD_MS,
+  maxRetryCount: 5,
 });
 
-
-function writeToCSV(message: string) {
-    //console.log(message);
-    fs.appendFileSync(
-      CSV_FILE,
-      `${message}\n`,
-    );
+function csvEscape(value: string | undefined | boolean): string {
+  if (value === undefined || value === null) {
+    return '';
   }
-  
-function printProgress(progress: string) {
-  readline.cursorTo(process.stdout, 0)
-  process.stdout.write(`${progress}`);
-}
-
-async function processQueue(queue: any[], ) {
-  let numProcessed: number = 0;
-  let numAdditionallyFetched: number = 0;
-  let totalDepsCount: number = 0;
-  console.log(`processing ${queue.length} orgs for dependency data...`);
-
-  try {
-      queue.forEach(async function(url) {
-        let totalDeps: any = []
-        const result = await requestManager.request(url)
-        if (result.data.total != "0") { 
-            //console.log(`total deps found: ${result.data.total}`)
-            totalDeps = result.data.results
-
-            let additionalPages: number = Math.floor(Number(result.data.total)/1000)
-            numAdditionallyFetched += additionalPages
-          
-            if (additionalPages > 0) {
-                //splice additional data to base data
-                totalDeps = totalDeps.concat(await getMoreDepsPages(url.url, url.body, additionalPages))
-            } 
-
-            for (const dep of totalDeps) {
-                //debug(`dep: ${JSON.stringify(dep)}`)
-                for (const project of dep.projects) {
-                    let projectUrl = `https://app.snyk.io/org/${url.orgSlug}/project/${project.id}` 
-                    writeToCSV(`${url.orgSlug},${url.orgId},${dep.id?.replace(',',';')},${dep.name},${dep.version?.replace(',',';')},${dep.latestVersion},${dep.latestVersionPublishedDate},${dep.firstPublishedDate},${dep.isDeprecated},${project.name},${project.id},${projectUrl}`)
-                }
-                
-            }
-
-            totalDepsCount += totalDeps.length
-        }
-        printProgress(` - ${++numProcessed}/${queue.length} completed (additional paged requests: ${numAdditionallyFetched}, total deps: ${totalDepsCount})`);
-      })
-
-  } catch (err: any) {
-      console.log(`error occurred: ${err}`);
-
+  const str = String(value);
+  if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+    return `"${str.replace(/"/g, '""')}"`;
   }
+  return str.replace(/,/g, ';');
 }
 
-async function getMoreDepsPages(baseURL: string, filterBody: any, additionalPages: number) {
-
-    let deps: any = []
-    let queue = []
-
-    // build request list for concurrency
-    for(var  page = 2; page <= (additionalPages+1); page++) {
-          let url = `${baseURL}&page=${page}`
-          debug(`queueing url: ${url}`)
-          queue.push({
-              verb: 'POST',
-              url: `${url}`,
-              body: filterBody
-            });
-    }
-
-    try {
-      const results: any[] = await requestManager.requestBulk(queue);
-      //console.log(`found ${res.data.results.length} results for ${JSON.stringify(reqData)}`)
-      results.forEach(function (result) {
-        deps = deps.concat(result.data.results)
-        //console.log(result.data.results)
-      })
-
-    } 
-    catch (err: any) {
-      console.log(`error occurred: ${err}`);
-    }
-
-    return deps
+function writeToCSV(message: string): void {
+  fs.appendFileSync(CSV_FILE, `${message}\n`);
 }
 
-async function getSnykOrgs () {
-    let orgs: any = []
-
-    try {
-        let response = await requestManager.request({
-            verb: 'GET',
-            url: `/orgs`,
-          });
-        orgs = response.data.orgs
-        orgs = orgs.filter(function (el: any)
-        {
-          return el.group && el.group.id == groupId ;
-        }
-        );
-        
-        debug(`orgs: ${JSON.stringify(orgs)}`)
-      } catch (err: any) {
-        console.log(err);
-      }
-    
-      return orgs
+function printProgress(progress: string): void {
+  readline.cursorTo(process.stdout, 0);
+  process.stdout.write(progress);
 }
 
-async function app() {
-    debug(`token: ${token}`)
-    debug(`groupId: ${groupId}`)
+async function getGroupOrgs(): Promise<GroupOrg[]> {
+  const orgs: GroupOrg[] = [];
+  let page = 1;
+  let hasMore = true;
 
-    let filterBody = {}
+  while (hasMore) {
+    const response = (await requestManager.request({
+      verb: 'GET',
+      url: `/group/${groupId}/orgs?perPage=${GROUP_ORGS_PER_PAGE}&page=${page}`,
+    })) as AxiosResponse<GroupOrgsResponse>;
 
-    if (dependencyList) { 
-      debug(`dependencyList: ${dependencyList}`)
-      try {
-        filterBody = {"filters": {"dependencies": String(dependencyList).split(',')}}
-      }
-      catch(err: any) {
-        console.log(`error parsing dependency-list, exiting...`)
-        exit(1)
-      }
-      console.log(`filtering dependencies for ${JSON.stringify(String(dependencyList).split(','), null, 2)}\n`)
+    const batch: GroupOrg[] = response.data?.orgs ?? [];
+    orgs.push(...batch);
 
-    }
-    writeToCSV(`org-slug,org-id,dep-id,dep-name,dep-version,latest-version,latest-version-published-date,first-published-date,is-deprecated,project-name,project-id,project-url`)
-    let queue = [];
-    // get all the orgs for the snyk group
-    const orgs = await getSnykOrgs();
-    debug(`orgs: ${orgs}`)
-    for (const org of orgs) {
-        debug(`org.id: ${org.id}`)
-        queue.push({
-            verb: 'POST',
-            url: `/org/${org.id}/dependencies?perPage=1000`,
-            body: filterBody,
-            orgId: org.id,
-            orgSlug: org.slug
+    hasMore = batch.length >= GROUP_ORGS_PER_PAGE;
+    page += 1;
+  }
+
+  debug(`found ${orgs.length} orgs in group ${groupId}`);
+  return orgs;
+}
+
+async function fetchDependencyPages(
+  orgId: string,
+  filterBody: string,
+): Promise<{ deps: Dependency[]; extraPageRequests: number }> {
+  const baseUrl = `/org/${orgId}/dependencies?perPage=${DEPS_PER_PAGE}`;
+  const first = (await requestManager.request({
+    verb: 'POST',
+    url: baseUrl,
+    body: filterBody,
+  })) as AxiosResponse<DependenciesResponse>;
+
+  const data = first.data;
+  const total = Number(data.total);
+  if (!total) {
+    return { deps: [], extraPageRequests: 0 };
+  }
+
+  let deps = data.results ?? [];
+  const extraPageRequests = Math.max(0, Math.ceil(total / DEPS_PER_PAGE) - 1);
+
+  if (extraPageRequests > 0) {
+    const pageRequests = [];
+    for (let page = 2; page <= extraPageRequests + 1; page++) {
+      pageRequests.push({
+        verb: 'POST' as const,
+        url: `${baseUrl}&page=${page}`,
+        body: filterBody,
       });
     }
-    await processQueue(queue)
-    console.log(`writing results to ${CSV_FILE}\n`)
+
+    const results = (await requestManager.requestBulk(
+      pageRequests,
+    )) as AxiosResponse<DependenciesResponse>[];
+    for (const result of results) {
+      const pageData = result.data;
+      deps = deps.concat(pageData.results ?? []);
+    }
+  }
+
+  return { deps, extraPageRequests };
 }
 
-app();
+function writeOrgDependencies(
+  orgSlug: string,
+  orgId: string,
+  deps: Dependency[],
+): void {
+  for (const dep of deps) {
+    for (const project of dep.projects ?? []) {
+      const projectUrl = `https://app.snyk.io/org/${orgSlug}/project/${project.id}`;
+      writeToCSV(
+        [
+          csvEscape(orgSlug),
+          csvEscape(orgId),
+          csvEscape(dep.id),
+          csvEscape(dep.name),
+          csvEscape(dep.version),
+          csvEscape(dep.latestVersion),
+          csvEscape(dep.latestVersionPublishedDate),
+          csvEscape(dep.firstPublishedDate),
+          csvEscape(dep.isDeprecated?.toString()),
+          csvEscape(project.name),
+          csvEscape(project.id),
+          csvEscape(projectUrl),
+        ].join(','),
+      );
+    }
+  }
+}
+
+async function processOrg(
+  job: OrgJob,
+  stats: {
+    processed: number;
+    total: number;
+    pagedRequests: number;
+    depCount: number;
+  },
+): Promise<void> {
+  const { deps, extraPageRequests } = await fetchDependencyPages(
+    job.orgId,
+    job.filterBody,
+  );
+
+  stats.pagedRequests += extraPageRequests;
+  stats.depCount += deps.length;
+  writeOrgDependencies(job.orgSlug, job.orgId, deps);
+
+  stats.processed += 1;
+  printProgress(
+    ` - ${stats.processed}/${stats.total} orgs completed (extra paged requests: ${stats.pagedRequests}, total deps: ${stats.depCount})`,
+  );
+}
+
+async function processOrgs(
+  queue: OrgJob[],
+  concurrency: number,
+): Promise<void> {
+  const stats = {
+    processed: 0,
+    total: queue.length,
+    pagedRequests: 0,
+    depCount: 0,
+  };
+
+  console.log(`Processing ${queue.length} orgs for dependency data...`);
+
+  await pMap(queue, (job) => processOrg(job, stats), { concurrency });
+}
+
+async function app(): Promise<void> {
+  debug(`groupId: ${groupId}`);
+
+  let filterBody = '{}';
+  if (dependencyList) {
+    const deps = String(dependencyList)
+      .split(',')
+      .map((d) => d.trim())
+      .filter(Boolean);
+    filterBody = JSON.stringify({ filters: { dependencies: deps } });
+    console.log(
+      `Filtering dependencies for:\n${JSON.stringify(deps, null, 2)}\n`,
+    );
+  }
+
+  writeToCSV(
+    'org-slug,org-id,dep-id,dep-name,dep-version,latest-version,latest-version-published-date,first-published-date,is-deprecated,project-name,project-id,project-url',
+  );
+
+  const orgs = await getGroupOrgs();
+  if (orgs.length === 0) {
+    console.error(
+      `No organizations found for group ${groupId}. Check SNYK_GROUP and token permissions.`,
+    );
+    process.exit(1);
+  }
+
+  const queue: OrgJob[] = orgs.map((org) => ({
+    orgId: org.id,
+    orgSlug: org.slug,
+    filterBody,
+  }));
+
+  await processOrgs(queue, orgConcurrency);
+  console.log(`\nWrote results to ${CSV_FILE}`);
+}
+
+app().catch((err: unknown) => {
+  console.error('Fatal error:', err);
+  process.exit(1);
+});
