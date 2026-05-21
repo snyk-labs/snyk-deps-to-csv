@@ -81,9 +81,8 @@ const argv = yargs(hideBin(process.argv))
     `\nUsage: $0 [OPTIONS]
 If no arguments are specified, values are picked up from environment variables.
 
-If pointing to a self-hosted or on-premise instance of Snyk,
-SNYK_API is required to be set in your environment,
-e.g. SNYK_API=https://my.snyk.domain/api. If omitted, Snyk SaaS is used.`,
+Set SNYK_API to your V1 API base URL (see README). Example:
+SNYK_API=https://api.snyk.io/v1 (US) or https://api.eu.snyk.io/v1 (EU).`,
   )
   .options({
     token: {
