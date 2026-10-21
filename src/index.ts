@@ -13,6 +13,7 @@ const debug = debugLib('snyk:index');
 
 /** V1 API: dependencies endpoint allows up to 150 requests/minute per user. */
 const DEFAULT_DEPENDENCIES_RATE_LIMIT_PER_MIN = 150;
+const MAX_DEPENDENCIES_RATE_LIMIT_PER_MIN = 150;
 /** Stay below the documented limit to leave headroom for retries after 429s. */
 const RATE_LIMIT_SAFETY_FACTOR = 0.9;
 const REQUEST_BURST_SIZE = 1;
@@ -104,7 +105,7 @@ SNYK_API=https://api.snyk.io/v1 (US) or https://api.eu.snyk.io/v1 (EU).`,
       default: ORG_PROCESS_CONCURRENCY,
     },
     'rate-limit': {
-      describe: `Dependencies API rate limit in requests per minute (default ${DEFAULT_DEPENDENCIES_RATE_LIMIT_PER_MIN}). A ${RATE_LIMIT_SAFETY_FACTOR * 100}% safety factor is applied on top.`,
+      describe: `Dependencies API rate limit in requests per minute (default ${DEFAULT_DEPENDENCIES_RATE_LIMIT_PER_MIN}, max ${MAX_DEPENDENCIES_RATE_LIMIT_PER_MIN}). A ${RATE_LIMIT_SAFETY_FACTOR * 100}% safety factor is applied on top.`,
       type: 'number',
       default: DEFAULT_DEPENDENCIES_RATE_LIMIT_PER_MIN,
     },
@@ -113,6 +114,14 @@ SNYK_API=https://api.snyk.io/v1 (US) or https://api.eu.snyk.io/v1 (EU).`,
     const rateLimit = args['rate-limit'];
     if (!Number.isFinite(rateLimit) || rateLimit <= 0) {
       throw new Error('--rate-limit must be a positive number');
+    }
+    if (rateLimit > MAX_DEPENDENCIES_RATE_LIMIT_PER_MIN) {
+      throw new Error(
+        `--rate-limit was set to ${rateLimit}, which exceeds the maximum allowed value of ${MAX_DEPENDENCIES_RATE_LIMIT_PER_MIN} requests per minute. ` +
+          `The Snyk V1 dependencies API allows at most ${MAX_DEPENDENCIES_RATE_LIMIT_PER_MIN} requests per minute per user; higher values would trigger ` +
+          `HTTP 429 (Too Many Requests) responses and slow down or fail the export. ` +
+          `Re-run with --rate-limit=${MAX_DEPENDENCIES_RATE_LIMIT_PER_MIN} or lower (or omit the flag to use the default of ${DEFAULT_DEPENDENCIES_RATE_LIMIT_PER_MIN}).`,
+      );
     }
     return true;
   })
