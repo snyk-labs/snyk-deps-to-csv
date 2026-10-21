@@ -100,7 +100,7 @@ node dist/index.js --token=$SNYK_TOKEN --group-id=$SNYK_GROUP \
 
 ### Rate limiting
 
-The Snyk dependencies API allows up to **150 requests per minute** per user. This tool uses [snyk-request-manager](https://github.com/snyk-labs/snyk-request-manager) with a leaky-bucket limiter (~135 req/min) and automatic retries (including after HTTP 429). Avoid running unfiltered exports more than once or twice per day for large groups.
+The Snyk dependencies API allows up to **150 requests per minute** per user. This tool uses [snyk-request-manager](https://github.com/snyk-labs/snyk-request-manager) with a leaky-bucket limiter (~135 req/min) and automatic retries (including after HTTP 429). Use `--rate-limit=<requests per minute>` (default 150) if your limit differs. A 90% safety factor is applied to the value. Avoid running unfiltered exports more than once or twice per day for large groups.
 
 ### Filter by dependencies file from all orgs in the specified group (*nix example)
 

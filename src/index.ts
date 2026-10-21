@@ -12,12 +12,9 @@ import readline from 'readline';
 const debug = debugLib('snyk:index');
 
 /** V1 API: dependencies endpoint allows up to 150 requests/minute per user. */
-const DEPENDENCIES_RATE_LIMIT_PER_MIN = 150;
+const DEFAULT_DEPENDENCIES_RATE_LIMIT_PER_MIN = 150;
 /** Stay below the documented limit to leave headroom for retries after 429s. */
 const RATE_LIMIT_SAFETY_FACTOR = 0.9;
-const REQUEST_PERIOD_MS = Math.ceil(
-  60_000 / (DEPENDENCIES_RATE_LIMIT_PER_MIN * RATE_LIMIT_SAFETY_FACTOR),
-);
 const REQUEST_BURST_SIZE = 1;
 const DEPS_PER_PAGE = 1000;
 const GROUP_ORGS_PER_PAGE = 100;
@@ -106,6 +103,18 @@ SNYK_API=https://api.snyk.io/v1 (US) or https://api.eu.snyk.io/v1 (EU).`,
       type: 'number',
       default: ORG_PROCESS_CONCURRENCY,
     },
+    'rate-limit': {
+      describe: `Dependencies API rate limit in requests per minute (default ${DEFAULT_DEPENDENCIES_RATE_LIMIT_PER_MIN}). A ${RATE_LIMIT_SAFETY_FACTOR * 100}% safety factor is applied on top.`,
+      type: 'number',
+      default: DEFAULT_DEPENDENCIES_RATE_LIMIT_PER_MIN,
+    },
+  })
+  .check((args) => {
+    const rateLimit = args['rate-limit'];
+    if (!Number.isFinite(rateLimit) || rateLimit <= 0) {
+      throw new Error('--rate-limit must be a positive number');
+    }
+    return true;
   })
   .demandOption(['token', 'group-id'])
   .help()
@@ -114,6 +123,10 @@ SNYK_API=https://api.snyk.io/v1 (US) or https://api.eu.snyk.io/v1 (EU).`,
 const groupId = argv['group-id'] as string;
 const dependencyList = argv['dependency-list'] as string | undefined;
 const orgConcurrency = argv.concurrency as number;
+const dependenciesRateLimitPerMin = argv['rate-limit'] as number;
+const REQUEST_PERIOD_MS = Math.ceil(
+  60_000 / (dependenciesRateLimitPerMin * RATE_LIMIT_SAFETY_FACTOR),
+);
 
 const requestManager = new requestsManager({
   snykToken: String(argv.token),
